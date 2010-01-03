@@ -3,7 +3,7 @@ class MPlayer
   attr_reader   :callbacks, :stats, :child_pid, :worker
 
   def initialize
-    messages :debug
+    messages :info
     @program   = DEFAULT_MPLAYER_PROGRAM
     @path      = nil
     @stats     = Hash.new
@@ -22,7 +22,7 @@ class MPlayer
       update_stat :raw_position, if @stats[:total_time] == 0.0
                                    0
                                  else
-                                   100 * @stast[:played_time] /
+                                   100 * @stats[:played_time] /
                                      @stats[:total_time]
                                  end
       update_stat :position,     @stats[:raw_position].to_i
@@ -43,7 +43,7 @@ class MPlayer
     hsh[:warn]        ||= false
     hsh[:class_only]  ||= true
     hsh[:prefix_only] ||= false
-    debug_flags(hsh)
+    ColorDebugMessages.global_debug_flags(hsh)
   end
   
   def inspect # :nodoc:
@@ -178,7 +178,7 @@ class MPlayer
   end
 
   def process_line(type, line)
-    info "LINE[ #{type.inspect} ] \"#{line}\""
+    #debug "LINE[ #{type.inspect} ] \"#{line}\""
     case type
     when :stdout then process_stdout(line)
     when :stderr then process_stderr(line)
@@ -209,7 +209,7 @@ class MPlayer
     percent = percent.to_f
     percent = 0.0   if percent < 0
     percent = 100.0 if percent > 100
-    debug "SEEK TO: #{percent}%"
+    info "SEEK TO: #{percent}%"
     seek percent, 1
   end
 end

@@ -11,6 +11,8 @@ class MPlayer
         @type = stream_type
         @io   = stream_io
         @line = ''
+        @outlist = Array.new
+        @mutex   = Mutex.new
       end
 
       def name
@@ -37,7 +39,7 @@ class MPlayer
               @io.read(1)
             end
         @line << c
-        process_line if c == "\n"
+        process_line if c == "\n" or c == "\r"
       end
 
       def run
@@ -46,28 +48,30 @@ class MPlayer
           begin
             debug "start"
             process_stream while @alive
-            debug msg("clean end!")
-          rescue => e
-            warn msg("err: #{e}")
+            debug "clean end!"
+          rescue IOError => e
+            if e.to_s =~ /stream closed/
+              debug "stream closed!"
+            else
+              raise BadStream, e.to_s
+            end
           ensure
-            debug msg("forcing close!")
-            close
+            cleanup
           end
         end
       end
 
-      def close
-        @io.close if @io
-        @io = nil
+      def cleanup
+        @io.close unless @io.closed?
       end
       
       def kill
         @alive = false
-        close
+        cleanup
       end
 
-      def wait
-        @thread.wait if @thread
+      def join
+        @thread.join if @thread
         @thread = nil
       end
     end
@@ -100,7 +104,7 @@ class MPlayer
 
     def send_command(cmd)
       debug "MPLAYER_CMD: #{cmd.inspect}"
-      @mplayer_io[:in].puts cmd
+      @io_stdin.puts cmd
     end
 
     def create_stream(type, io)
@@ -137,7 +141,7 @@ class MPlayer
       # then wait for the threads to cleanup after themselves
       info "Waiting for worker thread to exit..."
       send_each_stream :kill
-      send_each_stream :wait
+      send_each_stream :join
       @streams = Array.new
       debug "MPlayer process cleanly shutdown!"
     end
