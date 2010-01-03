@@ -23,6 +23,8 @@ Gem::Specification.new do |s|
      "README.rdoc",
      "Rakefile",
      "VERSION",
+     "easy_mplayer.gemspec",
+     "example1.rb",
      "lib/easy_mplayer.rb"
   ]
   s.homepage = %q{http://github.com/pdkl95/easy_mplayer}
