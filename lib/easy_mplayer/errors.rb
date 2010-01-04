@@ -33,35 +33,50 @@ class MPlayer
       super(to_s)
     end
   end
-
-  # tried to pass a slave-mode command to mplayer, but the call didn't
-  # match the API prototype mplayer itself provided
+  
+  # an error in sending a command to mplayer over its slave-mode API
   class BadCall      < MPlayerError
-    attr_reader :cmd, :given_args, :msg
+    attr_reader :cmd, :args
 
     # a type-prototype of how we attempted the mplayer API call
     def called_as
-      "#{cmd.cmd}(" + given_args.map do |x|
+      "#{cmd}(" + args.map do |x|
         x.class
       end.join(", ") + ")"
     end
 
-    def error_msg # :nodoc:
-      "#{called_as} - #{msg}"
-    end
-
-    def to_s # :nodoc:
-      ["Bad MPlayer call!",
-       "error: " + error_msg,
-       "usage: " + cmd.usage
-      ].join("\n")
+    def to_s
+      "\nBad MPlayer call: #{called_as}"
     end
     
-    def initialize(command, called_args, message)
-      @cmd        = command
-      @given_args = called_args
-      @msg        = message
+    def initialize(command, called_args)
+      @cmd  = command
+      @args = called_args
       super(to_s)
+    end
+  end
+
+  # tried to pass a slave-mode command to mplayer, but the call didn't
+  # match the API prototype mplayer itself provided
+  class BadCallArgs  < BadCall
+    attr_reader :msg, :usage
+    
+    def to_s # :nodoc:
+      super + " - #{msg}\nusage: #{usage}"
+    end
+    
+    
+    def initialize(command, called_args, message)
+      @msg   = message
+      @usage = command.usage
+      super(command.cmd, called_args)
+    end
+  end
+  
+  # not a valid command name
+  class BadCallName  < BadCall
+    def to_s
+      super + "\nNo such command \"#{cmd.inspect}\""
     end
   end
 end

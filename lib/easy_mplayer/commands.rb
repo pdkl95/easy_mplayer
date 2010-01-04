@@ -13,6 +13,17 @@ class MPlayer
           end
         end
       end
+
+      def find(name)
+        list[name.to_sym]
+      end
+
+      def validate!(args)
+        cmd = args.shift
+        obj = find(cmd)
+        raise BadCallName.new(cmd, args) unless obj
+        obj.validate!(args)
+      end
     end
 
     attr_reader :cmd, :names, :opts, :max, :min
@@ -57,14 +68,14 @@ class MPlayer
       end
     end
 
-    def validate_args(args)
+    def validate!(args)
       len = args.length
-      raise BadCall.new(self, args, "not enough args") if len < min
-      raise BadCall.new(self, args, "too many args")   if len > max
+      raise BadCallArgs.new(self, args, "not enough args") if len < min
+      raise BadCallArgs.new(self, args, "too many args")   if len > max
       returning Array.new do |new_args|
         args.each_with_index do |x,i|
           new_args.push convert_arg_type(x, opts[i]) or
-            raise BadCall.new(self, args, "type mismatch")
+            raise BadCallArgs.new(self, args, "type mismatch")
         end
       end
     end

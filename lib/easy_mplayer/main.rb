@@ -1,31 +1,73 @@
 class MPlayer
-  attr_accessor :path, :program
-  attr_reader   :callbacks, :stats, :child_pid, :worker
+  # mplayer is usually in the same place, but change this
+  # if your install is strange
+  DEFAULT_MPLAYER_PROGRAM = '/usr/bin/mplayer'
+  
+  # the color_debug_message parameter sets we can switch
+  # between, for convenience. (flags for ColorDebugMessages)
+  DEBUG_MESSAGE_TYPES = {
+    :quiet => {
+    },
+    :error_only => {
+      :warn       => true
+    },
+    :info => {
+      :warn       => true,
+      :info       => true
+    },
+    :debug => {
+      :warn       => true,
+      :info       => true,
+      :debug      => true,
+      :class_only => false
+    }
+  }
+
+  attr_accessor :path, :program, :seek_increment
+  attr_reader   :callbacks, :stats, :child_pid, :state
 
   def initialize
     messages :info
     @program   = DEFAULT_MPLAYER_PROGRAM
     @path      = nil
+    @state     = :shutdown
     @stats     = Hash.new
     @callbacks = Hash.new
-    @playing   = false
     @worker    = nil
+    @seek_increment = 5
     setup_internal_callbacks!
   end
-
+  
   def setup_internal_callbacks!
+    callback :update_stat do |*args|
+      update_stat *args
+    end
+    
     callback :header_end do
       @mplayer_header = false
     end
 
-    callback :update_position do
-      update_stat :raw_position, if @stats[:total_time] == 0.0
-                                   0
-                                 else
-                                   100 * @stats[:played_time] /
-                                     @stats[:total_time]
-                                 end
-      update_stat :position,     @stats[:raw_position].to_i
+    callback :file_error do
+      warn "File error!"
+      stop!
+    end
+
+    callback :played_time do |played_time|
+      total = stats[:total_time]
+      if total and total != 0.0
+        pos = (100 * played_time / total)
+        update_stat :raw_position, pos
+        update_stat :position,     pos.to_i
+      end
+    end
+    
+    callback :startup do
+      callback! :play
+    end
+    
+    callback :shutdown do
+      @worker = nil
+      callback! :stop
     end
   end
 
@@ -61,15 +103,18 @@ class MPlayer
   
   # call an entire callback chain, passing in a list of args
   def callback!(name, *args)
+    #puts "CALLBACK! #{name.inspect} #{args.inspect}"
     callbacks(name).each do |block|
       #puts "CALLBACK[ #{name.inspect} ] -> (" + args.join(', ') + ')'
       block.call(*args)
     end
   end
   
-  # register a function into the named callback chain
-  def callback(name, &block)
-    callbacks(name).push block
+  # register a function into each of the named callback chains
+  def callback(*names, &block)
+    names.each do |name|
+      callbacks(name).push block
+    end
   end
 
   def ready?
@@ -77,11 +122,28 @@ class MPlayer
   end
 
   def playing?
-    worker and worker.playing?
+    !@paused and running?
+  end
+
+  def worker
+    must_be_ready! and create_worker unless @worker
+    @worker
+  end
+
+  def create_worker
+    callback! :creating_worker
+    @worker = Worker.new(self)
+    @stats  = Hash.new
+    @paused = false
+    callback! :worker_running
+  end
+
+  def send_command(*args)
+    worker.send_command(*args)
   end
 
   def running?
-    !!worker
+    !!@worker and @worker.ok?
   end
   
   def must_be_ready!
@@ -90,47 +152,6 @@ class MPlayer
   
   def must_be_running!
     running? or raise NotRunning
-  end
-
-  def mplayer_command_line(target = path)
-    cmd = "#{program} -slave "
-    cmd += "-playlist " if target=~ /\.m3u$/
-    cmd += target.to_s
-  end
-
-  def find_mplayer_command(name)
-    Command.list[name.to_sym]
-  end
-
-  def mplayer_cmd!(cmd)
-    #must_be_running!
-    if worker
-      worker.send_command(cmd)
-    else
-      warn "MPlayer command sent, but the worker is not running!"
-      warn "Commmand was: \"#{cmd}\""
-    end
-  end
-
-  def mplayer_cmd(command, args)
-    args = command.validate_args(args)
-    mplayer_cmd! [command.cmd, *args].join(' ')
-  end
-
-  def send_mplayer_cmd(name, args)
-    mplayer_cmd find_mplayer_command(name), args
-  end
-  
-  alias_method :old_method_missing, :method_missing
-  def method_missing(sym, *args, &block)
-    if command = find_mplayer_command(sym)
-      meta_def(command.cmd) do |*cmd_args|
-        mplayer_cmd command, cmd_args
-      end
-      send(sym, *args)
-    else
-      old_method_missing sym, *args, &block
-    end
   end
 
   def update_stat(name, newval)
@@ -142,74 +163,66 @@ class MPlayer
     end
   end
   
-  def check_line(patterns, line)
-    patterns.each_pair do |name, pat|
-      if md = pat[:re].match(line)
-        args = md.captures.map do |x|
-          case x
-          when /^\d+$/      then Integer(x)
-          when /^\d+\.\d+$/ then Float(x)
-          else x
-          end
-        end
-        
-        (pat[:stat] || []).each do |field|
-          update_stat field, args.shift
-        end
-        
-        callback! name, args
-        return name
-      end
-    end
-    nil
-  end
-
-  def process_stdout(line)
-    if @mplayer_header
-      return if check_line(MATCH_HEADER, line)
-    end
-    return if check_line(MATCH_NORMAL, line)
-    #debug "MP> #{line}"
-    callback! :stdout, line
-  end
-
-  def process_stderr(line)
-    callback! :stderr, line
-  end
-
-  def process_line(type, line)
-    #debug "LINE[ #{type.inspect} ] \"#{line}\""
-    case type
-    when :stdout then process_stdout(line)
-    when :stderr then process_stderr(line)
-    else raise MPlayerError, "Unknown stream type #{type.inspect}"
-    end
-  end
-
-  def play!
-    must_be_ready!
+  def play
     stop if playing?
     
     info "PLAY: #{path}"
-    callback! :preparing_mplayer
-    @worker = Worker.new(self)
-    callback! :playing
+    worker.startup!
   end
 
-  def stop!
+  def stop
     info "STOP!"
     @worker.shutdown! if @worker
-    @worker = nil
-    callback! :stopped
   end
 
-  def seek_percent(percent)
-    return unless running?
+  def paused?
+    @paused
+  end
+
+  def pause
+    return if paused?
+    info "PAUSE!"
+    send_command :pause
+    @paused = true
+    callback! :pause
+  end
+
+  def unpause
+    return unless paused?
+    info "UNPAUSE!"
+    send_command :pause
+    @paused = false
+    callback! :unpause
+  end
+
+  def pause_or_unpause
+    paused? ? unpause : pause
+  end
+
+  def seek_to_percent(percent)
     return if percent.to_i == @stats[:position]
     percent = percent.to_f
     percent = 0.0   if percent < 0
     percent = 100.0 if percent > 100
     info "SEEK TO: #{percent}%"
-    seek percent, 1
+    send_command :seek, percent, 1
+  end
+
+  def seek_to_time(seconds)
+    info "SEEK TO: #{seconds} seconds"
+    send_command :seek, seconds, 1
+  end
+
+  def seek_by(amount)
+    info "SEEK BY: #{amount}"
+    send_command :seek, amount, 0
+  end
+
+  def seek_forward(amount = seek_increment)
+    seek_by(amount)
+  end
+
+  def seek_reverse(amount = seek_increment)
+    seek_by(-amount)
   end
 end

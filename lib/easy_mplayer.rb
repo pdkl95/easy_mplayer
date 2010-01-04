@@ -8,7 +8,6 @@ class MPlayer
   include ColorDebugMessages
 end
 
-require 'easy_mplayer/constants'
 require 'easy_mplayer/errors'
 require 'easy_mplayer/commands'
 require 'easy_mplayer/worker'

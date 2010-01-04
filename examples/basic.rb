@@ -9,7 +9,7 @@ raise "usage: #{$0} <file>" if ARGV.length != 1
 $file = ARGV[0]
 
 def show(msg)
-  puts 'EXAMPLE: ' + msg
+  puts 'EXAMPLE<basic> ' + msg
 end
 
 def command(msg)
@@ -28,7 +28,7 @@ show "Setting target as: #{$file}"
 mplayer.path = $file
 
 show "Spawning the mplayer process!"
-mplayer.play!
+mplayer.play
 
 # set this true to see various basic commands
 # set it false to see the basic "wait until the file is done" check
@@ -40,19 +40,19 @@ if show_basic_commands
   end
 
   command "pause (again, to resume)" do
-    mplayer.pause
+    mplayer.unpause
   end
 
   command "seek to 25%" do
-    mplayer.seek_percent 25.0
+    mplayer.seek_to_percent 25.0
   end
 
   command "seek back to 10%" do
-    mplayer.seek_percent 10.0
+    mplayer.seek_to_percent 10.0
   end
 
   command "stop" do
-    mplayer.stop!
+    mplayer.stop
   end
   
 else
