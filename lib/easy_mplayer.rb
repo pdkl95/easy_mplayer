@@ -12,4 +12,5 @@ require 'easy_mplayer/errors'
 require 'easy_mplayer/commands'
 require 'easy_mplayer/worker'
 require 'easy_mplayer/main'
+require 'easy_mplayer/helpers'
 

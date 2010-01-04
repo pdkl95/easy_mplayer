@@ -3,6 +3,9 @@ class MPlayer
   # if your install is strange
   DEFAULT_MPLAYER_PROGRAM = '/usr/bin/mplayer'
   
+  # the number of seconds we normally seek by in ff/rw
+  DEFAULT_STEP_INCREMENT = 10
+  
   # the color_debug_message parameter sets we can switch
   # between, for convenience. (flags for ColorDebugMessages)
   DEBUG_MESSAGE_TYPES = {
@@ -34,11 +37,11 @@ class MPlayer
     @stats     = Hash.new
     @callbacks = Hash.new
     @worker    = nil
-    @seek_increment = 5
+    @seek_increment = DEFAULT_STEP_INCREMENT
     setup_internal_callbacks!
   end
   
-  def setup_internal_callbacks!
+  def setup_internal_callbacks! # :nodoc:
     callback :update_stat do |*args|
       update_stat *args
     end
@@ -116,113 +119,59 @@ class MPlayer
       callbacks(name).push block
     end
   end
-
+  
+  # true if it is ok to call #play
   def ready?
     !!path
   end
+  
+  # true if we are running, yet the media has stopped
+  def paused?
+    @paused
+  end
 
+  # true if both mplayer is running and the pause flag is not set
   def playing?
     !@paused and running?
   end
-
-  def worker
+  
+  # true if the mplayer process is active and running
+  def running?
+    !!@worker and @worker.ok?
+  end
+  
+  # pipe a command to mplayer via slave mode
+  def send_command(*args)
+    worker.send_command(*args)
+  end
+  
+  def worker # :nodoc:
     must_be_ready! and create_worker unless @worker
     @worker
   end
 
-  def create_worker
+  def create_worker # :nodoc:
     callback! :creating_worker
     @worker = Worker.new(self)
     @stats  = Hash.new
     @paused = false
     callback! :worker_running
   end
-
-  def send_command(*args)
-    worker.send_command(*args)
-  end
-
-  def running?
-    !!@worker and @worker.ok?
-  end
   
-  def must_be_ready!
+  def must_be_ready! # :nodoc:
     ready? or raise NotReady
   end
   
-  def must_be_running!
+  def must_be_running! # :nodoc:
     running? or raise NotRunning
   end
 
-  def update_stat(name, newval)
+  def update_stat(name, newval) # :nodoc:
     name = name.to_sym
     if @stats[name] != newval
       debug "STATS[:#{name}] -> #{newval.inspect}"
       @stats[name] = newval
       callback! name, newval
     end
-  end
-  
-  def play
-    stop if playing?
-    
-    info "PLAY: #{path}"
-    worker.startup!
-  end
-
-  def stop
-    info "STOP!"
-    @worker.shutdown! if @worker
-  end
-
-  def paused?
-    @paused
-  end
-
-  def pause
-    return if paused?
-    info "PAUSE!"
-    send_command :pause
-    @paused = true
-    callback! :pause
-  end
-
-  def unpause
-    return unless paused?
-    info "UNPAUSE!"
-    send_command :pause
-    @paused = false
-    callback! :unpause
-  end
-
-  def pause_or_unpause
-    paused? ? unpause : pause
-  end
-
-  def seek_to_percent(percent)
-    return if percent.to_i == @stats[:position]
-    percent = percent.to_f
-    percent = 0.0   if percent < 0
-    percent = 100.0 if percent > 100
-    info "SEEK TO: #{percent}%"
-    send_command :seek, percent, 1
-  end
-
-  def seek_to_time(seconds)
-    info "SEEK TO: #{seconds} seconds"
-    send_command :seek, seconds, 1
-  end
-
-  def seek_by(amount)
-    info "SEEK BY: #{amount}"
-    send_command :seek, amount, 0
-  end
-
-  def seek_forward(amount = seek_increment)
-    seek_by(amount)
-  end
-
-  def seek_reverse(amount = seek_increment)
-    seek_by(-amount)
   end
 end
