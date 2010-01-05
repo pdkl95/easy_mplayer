@@ -5,11 +5,11 @@
 
 Gem::Specification.new do |s|
   s.name = %q{easy_mplayer}
-  s.version = "0.1.0"
+  s.version = "1.0.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Brent Sanders"]
-  s.date = %q{2010-01-02}
+  s.date = %q{2010-01-05}
   s.description = %q{A wrapper to manage mplayer, that supports callbacks to easyily support event-driven GUIs}
   s.email = %q{gem-mplayer@thoughtnoise.net}
   s.extra_rdoc_files = [
@@ -24,14 +24,29 @@ Gem::Specification.new do |s|
      "Rakefile",
      "VERSION",
      "easy_mplayer.gemspec",
-     "example1.rb",
-     "lib/easy_mplayer.rb"
+     "examples/basic.rb",
+     "examples/callbacks.rb",
+     "examples/inherit_class.rb",
+     "examples/minimal.rb",
+     "lib/easy_mplayer.rb",
+     "lib/easy_mplayer/callback.rb",
+     "lib/easy_mplayer/commands.rb",
+     "lib/easy_mplayer/errors.rb",
+     "lib/easy_mplayer/helpers.rb",
+     "lib/easy_mplayer/main.rb",
+     "lib/easy_mplayer/worker.rb"
   ]
   s.homepage = %q{http://github.com/pdkl95/easy_mplayer}
   s.rdoc_options = ["--charset=UTF-8"]
   s.require_paths = ["lib"]
   s.rubygems_version = %q{1.3.5}
   s.summary = %q{Wrapper to launch and control MPlayer}
+  s.test_files = [
+    "examples/minimal.rb",
+     "examples/basic.rb",
+     "examples/inherit_class.rb",
+     "examples/callbacks.rb"
+  ]
 
   if s.respond_to? :specification_version then
     current_version = Gem::Specification::CURRENT_SPECIFICATION_VERSION
