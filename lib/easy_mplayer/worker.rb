@@ -33,7 +33,8 @@ class MPlayer
         },
         :audio_info => {
           :re   => /^AUDIO: (\d+) Hz, (\d+) ch, (\S+), ([0-9.]+) kbit/,
-          :stat => [:sample_rate, :audio_channels, :audio_format, :data_rate]
+          :stat => [:sample_rate, :audio_channels, :audio_format, :data_rate],
+          :call => :audio_stats
         }
       }
 
@@ -54,15 +55,12 @@ class MPlayer
         @line    = ''
         @outlist = Array.new
         @stats   = Hash.new
+        @select_wait_time = p.opts[:select_wait_time]
         @sent_update_position = false
       end
 
-      def name
-        "STREAM [#{@type}]"
-      end
-
       def prefix(msg)
-        "#{name} #{msg}"
+        "STREAM [#{@type}] #{msg}"
       end
 
       def debug(msg); super prefix(msg); end
@@ -130,7 +128,7 @@ class MPlayer
       end
 
       def process_stream
-        result = IO.select([@io], nil, nil, 1)
+        result = IO.select([@io], nil, nil, @select_wait_time)
         return if result.nil? or result.empty?
 
         c = @io.read(1)
@@ -187,8 +185,8 @@ class MPlayer
       @pending = Array.new
       @mutex   = Mutex.new
       @failed  = nil
-      
-      @thread_safe_callbacks = false
+
+      @thread_safe_callbacks = @parent.opts[:thread_safe_callbacks]
       @shutdown_in_progress  = false
       
       begin
@@ -218,7 +216,7 @@ class MPlayer
     end
     
     def queue_callback(args)
-      if @thead_safe_callbacks
+      if @thread_safe_callbacks
         lock! do
           @pending.push(args)
         end
@@ -234,7 +232,6 @@ class MPlayer
         list = @pending
         @pending = Array.new
       end
-      debug "found #{list.length} items"
       list.each do |args|
         @parent.callback! args.first, *(args.last)
       end

@@ -1,16 +1,12 @@
 class MPlayer
+  # all of these can be overridden by passing them to #new
   DEFAULT_OPTS = {
-    :program       => '/usr/bin/mplayer',
-    :message_style => :info,
-    :seek_size     => 10
+    :program               => '/usr/bin/mplayer',
+    :message_style         => :info,
+    :seek_size             => 10,
+    :select_wait_time      => 1,
+    :thread_safe_callbacks => false
   }
-  
-  # mplayer is usually in the same place, but change this
-  # if your install is strange
-  DEFAULT_MPLAYER_PROGRAM = '/usr/bin/mplayer'
-  
-  # the number of seconds we normally seek by in ff/rw
-  DEFAULT_STEP_INCREMENT = 10
   
   # the color_debug_message parameter sets we can switch
   # between, for convenience. (flags for ColorDebugMessages)
@@ -32,22 +28,23 @@ class MPlayer
     }
   }
 
-  attr_reader   :callbacks, :stats, :opts
+  attr_reader :callbacks, :stats, :opts
 
   def initialize(new_opts=Hash.new)
-    raise "A :path field is required!" unless new_opts[:path]
-    raise ":path not a valid file?"    unless File.file?(new_opts[:path])
     @opts = DEFAULT_OPTS.merge(new_opts)
-    messages opts[:message_style]
+    set_message_style opts[:message_style]
+    
+    unless File.executable?(@opts[:program])
+      raise NoPlayerFound.new(@opts[:program]) 
+    end
+    unless @opts[:path] and File.readable?(new_opts[:path])
+      raise NoTargetPath.new(@opts[:path]) 
+    end
     
     @stats     = Hash.new
     @callbacks = Hash.new
     @worker    = nil
 
-    setup_internal_callbacks!
-  end
-  
-  def setup_internal_callbacks! # :nodoc:
     callback :update_stat do |*args|
       update_stat *args
     end
@@ -62,6 +59,7 @@ class MPlayer
     end
 
     callback :played_time do |played_time|
+      update_stat :played_seconds, played_time.to_i
       total = stats[:total_time]
       if total and total != 0.0
         pos = (100 * played_time / total)
@@ -85,7 +83,7 @@ class MPlayer
   #   :error_only Off except for errors
   #   :info       Also show information messages
   #   :debug      Heavy debug output (spammy)
-  def messages(type)
+  def set_message_style(type)
     hsh = DEBUG_MESSAGE_TYPES[type.to_sym] or
       raise BadMsgType.new(type.inspect)
     hsh = hsh.dup
@@ -95,11 +93,12 @@ class MPlayer
     hsh[:class_only]  ||= true
     hsh[:prefix_only] ||= false
     ColorDebugMessages.global_debug_flags(hsh)
+    opts[:message_style] = type
   end
   
   def inspect # :nodoc:
     vals = [['running', running?],
-            ['playing', playing?]]
+            ['paused',  paused?]]
     vals << ['info', stats.inspect] if running?
     "#<#{self.class} " + vals.map do |x|
       x.first + '=' + x.last.to_s
@@ -114,9 +113,7 @@ class MPlayer
   def callback!(name, *args) # :nodoc:
     #puts "CALLBACK! #{name.inspect} #{args.inspect}"
     callbacks(name).each do |block|
-      #puts "CALLBACK[ #{name.inspect} ] -> (" + args.join(', ') + ')'
       block.call(*args)
-      #instance_exec *args, &block
     end
   end
   
@@ -132,11 +129,6 @@ class MPlayer
     @paused
   end
 
-  # true if both mplayer is running and the pause flag is not set
-  def playing?
-    !@paused and running?
-  end
-  
   # true if the mplayer process is active and running
   def running?
     !!@worker and @worker.ok?

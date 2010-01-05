@@ -1,7 +1,6 @@
 require 'color_debug_messages'
 require 'open3'
 require 'facets/kernel/returning'
-require 'facets/kernel/instance_exec'
 require 'facets/kernel/meta_class'
 require 'facets/kernel/meta_def'
 

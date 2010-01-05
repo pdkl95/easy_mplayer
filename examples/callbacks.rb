@@ -13,10 +13,10 @@ class MyApp
     case key
     when 'q', 'Q' then @mplayer.stop
     when " "      then @mplayer.pause_or_unpause
-    when "\e[A"   then @mplayer.seek_forward(60)
-    when "\e[B"   then @mplayer.seek_reverse(60)
-    when "\e[C"   then @mplayer.seek_forward
-    when "\e[D"   then @mplayer.seek_reverse
+    when "\e[A"   then @mplayer.seek_forward(60)     #    UP arrow
+    when "\e[B"   then @mplayer.seek_reverse(60)     #  DOWN arrow
+    when "\e[C"   then @mplayer.seek_forward         # RIGHT arrow
+    when "\e[D"   then @mplayer.seek_reverse         #  LEFT arrow
     end
   end
 
@@ -46,18 +46,35 @@ class MyApp
   def initialize(file)
     @mplayer = MPlayer.new( :path => file )
 
-#    @mplayer.callback :position do |current_time|
-#      total = @mplayer.stats[:total_time]
-#      show "Song position: #{current_time} / #{total} seconds"
-#    end
+    @mplayer.callback :audio_stats do
+      show "Audio is: "
+      show "  ->    sample_rate: #{@mplayer.stats[:sample_rate]} Hz"
+      show "  -> audio_channels: #{@mplayer.stats[:audio_channels]}"
+      show "  ->   audio_format: #{@mplayer.stats[:audio_format]}"
+      show "  ->      data_rate: #{@mplayer.stats[:data_rate]} kb/s"
+    end
 
-#    @mplayer.callback :pause, :unpause do
-#      show "song state: " + (@mplayer.paused? ? "PAUSED!" : "RESUMED!")
-#    end
+    @mplayer.callback :position do |position|
+      show "Song position percent: #{position}%"
+    end
 
-#    @mplayer.callback :stop do
-#      show "song ended!"
-#    end
+    @mplayer.callback :played_seconds do |val|
+      total  = @mplayer.stats[:total_time]
+      show "song position in seconds: #{val} / #{total}"
+    end
+
+    @mplayer.callback :pause, :unpause do |pause_state|
+      show "song state: " + (pause_state ? "PAUSED!" : "RESUMED!")
+    end
+
+    @mplayer.callback :play do
+      show "song started!"
+    end
+
+    @mplayer.callback :stop do
+      show "song ended!"
+      puts "final stats were: #{@mplayer.stats.inspect}"
+    end
   end
 end
 

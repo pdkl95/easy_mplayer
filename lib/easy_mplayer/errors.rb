@@ -1,7 +1,35 @@
 class MPlayer
   module Error # :nodoc:all
     # all errors thrown form this library will be of this type
-    class MPlayerError < RuntimeError
+    class MPlayerError  < RuntimeError
+    end
+
+    class StartupError  < MPlayerError
+      attr_reader :path
+      
+      def to_s
+        str = "Missing startup requirement!\n"
+        str += "File \"#{path}\" does not exist!\n" unless File.exists?(path)
+      end
+      
+      def initialize(path)
+        @path = path
+        super(to_s)
+      end
+    end
+
+    class NoPlayerFound < StartupError
+      def to_s
+        str = super
+        str += "File \"#{path}\" is not executable!\n" unless File.executable?(path)
+      end
+    end
+
+    class NoTargetPath  < StartupError
+      def to_s
+        str = super
+        str += "file \"#{path}\" is not readable!\n" unless File.readable?(path)
+      end
     end
 
     # some unknown error having to do with the streams/threads that
