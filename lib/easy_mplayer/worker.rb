@@ -5,24 +5,15 @@ class MPlayer
     class Stream
       include ColorDebugMessages
 
-      # things we find out of the stream header, before the media
-      # starts to play. 
-      MATCH_HEADER = {
+      MATCH_STDOUT = { # :nodoc:
         :version => {
-          :re   => /^MPlayer\s(\S+)\s\(C\) \d+\-\d+/,
+          :re   => /^MPlayer\s(\S+)\s\(C\)/,
           :stat => [:version]
         },
         :server => {
           :re   => /^Connecting to server (\S+)\[(\d+\.\d+\.\d+\.\d+)\]:/,
           :stat => [:server, :server_ip]
         },
-        :header_end => {
-          :re  => /^Starting playback/,
-          :call => :header_end
-        }
-      }
-
-      MATCH_NORMAL = { # :nodoc:
         :stream_info => {
           :re   => /^ICY Info: StreamTitle='(.*?)';StreamUrl='(.*?)';/,
           :stat => [:stream_title, :stream_url]
@@ -33,12 +24,35 @@ class MPlayer
         },
         :audio_info => {
           :re   => /^AUDIO: (\d+) Hz, (\d+) ch, (\S+), ([0-9.]+) kbit/,
-          :stat => [:sample_rate, :audio_channels, :audio_format, :data_rate],
+          :stat => [:audio_sample_rate, :audio_channels,
+                    :audio_format, :audio_data_rate],
           :call => :audio_stats
+        },
+        :video_info => {
+          :re   => /^VIDEO:\s+\[(\S{4})\]\s+(\d+)x(\d+)\s+(\d+)bpp\s+(\d+\.\d+)\s+fps/,
+          :stat => [:video_fourcc, :video_x_size, :video_y_size,
+                    :video_bpp, :video_fps],
+          :call => :video_stats
+        },
+        :video_decoder => {
+          :re   => /^Opening video decoder: \[(\S+)\]/,
+          :stat => [:video_decoder]
+        },
+        :audio_decoder => {
+          :re   => /^Opening audio decoder: \[(\S+)\]/,
+          :stat => [:audio_decoder]
+        },
+        :video_codec => {
+          :re   => /^Selected video codec: \[(\S+)\]/,
+          :stat => [:video_codec]
+        },
+        :audio_codec => {
+          :re   => /^Selected audio codec: \[(\S+)\]/,
+          :stat => [:audio_codec]
         }
       }
 
-      MATCH_ERRORS = { # :nodoc:
+      MATCH_STDERR = { # :nodoc:
         :file_not_found => {
           :re => /^File not found: /,
           :call => :file_error
@@ -108,20 +122,17 @@ class MPlayer
       end
 
       def process_stdout(line)
-        if @mplayer_header
-          return if check_line(MATCH_HEADER, line)
-        end
-        check_line(MATCH_NORMAL, line)
+        check_line(MATCH_STDOUT, line)
       end
 
       def process_stderr(line)
-        if check_line(MATCH_ERRORS, line)
+        if check_line(MATCH_STDERR, line)
           stream_error(:stderr)
         end
       end
 
       def process_line
-        #debug "LINE> \"#{@line}\""
+        debug "LINE> \"#{@line}\""
         send "process_#{@type}", @line
         # callback! @type, @line
         @line = ''

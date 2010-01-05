@@ -5,7 +5,7 @@ class MPlayer
     :message_style         => :info,
     :seek_size             => 10,
     :select_wait_time      => 1,
-    :thread_safe_callbacks => false
+    :thread_safe_callbacks => true
   }
   
   # the color_debug_message parameter sets we can switch
@@ -30,6 +30,28 @@ class MPlayer
 
   attr_reader :callbacks, :stats, :opts
 
+  class << self
+    def class_callbacks # :nodoc:
+      @@class_callbacks ||= Array.new
+    end
+    
+    # register a block with the named callback(s). This is the same
+    # as the instance-method, generally, but it uses instance_exec to
+    # give the block the same scope (the MPlayer instance)
+    def callback(*names, &block)
+      names.each do |name|
+        class_callbacks << {
+          :name  => name,
+          :type  => :class,
+          :block => block
+        }
+      end
+    end
+  end
+  
+  # create a new object. The option hash must have, at a minimum, a
+  # :path reference to the file we want to play, or an exception will
+  # be raised.
   def initialize(new_opts=Hash.new)
     @opts = DEFAULT_OPTS.merge(new_opts)
     set_message_style opts[:message_style]
@@ -45,37 +67,38 @@ class MPlayer
     @callbacks = Hash.new
     @worker    = nil
 
-    callback :update_stat do |*args|
-      update_stat *args
+    self.class.class_callbacks.each do |opts|
+      opts[:scope] = self
+      CallbackList.register opts
     end
-    
-    callback :header_end do
-      @mplayer_header = false
-    end
+  end
 
-    callback :file_error do
-      warn "File error!"
-      stop!
-    end
+  callback :update_stat do |*args|
+    update_stat *args
+  end
 
-    callback :played_time do |played_time|
-      update_stat :played_seconds, played_time.to_i
-      total = stats[:total_time]
-      if total and total != 0.0
-        pos = (100 * played_time / total)
-        update_stat :raw_position, pos
-        update_stat :position,     pos.to_i
-      end
+  callback :file_error do
+    warn "File error!"
+    stop!
+  end
+
+  callback :played_time do |played_time|
+    update_stat :played_seconds, played_time.to_i
+    total = stats[:total_time]
+    if total and total != 0.0
+      pos = (100 * played_time / total)
+      update_stat :raw_position, pos
+      update_stat :position,     pos.to_i
     end
-    
-    callback :startup do
-      callback! :play
-    end
-    
-    callback :shutdown do
-      @worker = nil
-      callback! :stop
-    end
+  end
+  
+  callback :startup do
+    callback! :play
+  end
+  
+  callback :shutdown do
+    @worker = nil
+    callback! :stop
   end
 
   # can be any of:
@@ -105,22 +128,16 @@ class MPlayer
     end.join(' ') + '>'
   end
 
-  def callbacks(name) # :nodoc:
-    @callbacks[name.to_sym] ||= Array.new
-  end
-  
   # call an entire callback chain, passing in a list of args
   def callback!(name, *args) # :nodoc:
     #puts "CALLBACK! #{name.inspect} #{args.inspect}"
-    callbacks(name).each do |block|
-      block.call(*args)
-    end
+    CallbackList.run!(name, args)
   end
   
   # register a function into each of the named callback chains
   def callback(*names, &block)
     names.each do |name|
-      callbacks(name).push block
+      CallbackList.register :name => name, :block => block, :type => :instance
     end
   end
   

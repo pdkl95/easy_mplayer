@@ -8,6 +8,11 @@ require 'easy_mplayer'
 raise "usage: #{$0} <file>" if ARGV.length != 1
 $file = ARGV[0]
 
+#
+# This walks through some of the basic commands to
+# control already-playing media
+#
+
 def show(msg)
   puts 'EXAMPLE<basic> ' + msg
 end
