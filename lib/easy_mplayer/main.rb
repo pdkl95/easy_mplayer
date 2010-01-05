@@ -1,4 +1,10 @@
 class MPlayer
+  DEFAULT_OPTS = {
+    :program       => '/usr/bin/mplayer',
+    :message_style => :info,
+    :seek_size     => 10
+  }
+  
   # mplayer is usually in the same place, but change this
   # if your install is strange
   DEFAULT_MPLAYER_PROGRAM = '/usr/bin/mplayer'
@@ -26,18 +32,18 @@ class MPlayer
     }
   }
 
-  attr_accessor :path, :program, :seek_increment
-  attr_reader   :callbacks, :stats, :child_pid, :state
+  attr_reader   :callbacks, :stats, :opts
 
-  def initialize
-    messages :info
-    @program   = DEFAULT_MPLAYER_PROGRAM
-    @path      = nil
-    @state     = :shutdown
+  def initialize(new_opts=Hash.new)
+    raise "A :path field is required!" unless new_opts[:path]
+    raise ":path not a valid file?"    unless File.file?(new_opts[:path])
+    @opts = DEFAULT_OPTS.merge(new_opts)
+    messages opts[:message_style]
+    
     @stats     = Hash.new
     @callbacks = Hash.new
     @worker    = nil
-    @seek_increment = DEFAULT_STEP_INCREMENT
+
     setup_internal_callbacks!
   end
   
@@ -75,10 +81,10 @@ class MPlayer
   end
 
   # can be any of:
-  #   +:quiet+      Supperss all output!
-  #   +:error_only+ Off except for errors
-  #   +:info+       Also show information messages
-  #   +:debug+      Heavy debug output (spammy)
+  #   :quiet      Supperss all output!
+  #   :error_only Off except for errors
+  #   :info       Also show information messages
+  #   :debug      Heavy debug output (spammy)
   def messages(type)
     hsh = DEBUG_MESSAGE_TYPES[type.to_sym] or
       raise BadMsgType.new(type.inspect)
@@ -105,11 +111,12 @@ class MPlayer
   end
   
   # call an entire callback chain, passing in a list of args
-  def callback!(name, *args)
+  def callback!(name, *args) # :nodoc:
     #puts "CALLBACK! #{name.inspect} #{args.inspect}"
     callbacks(name).each do |block|
       #puts "CALLBACK[ #{name.inspect} ] -> (" + args.join(', ') + ')'
       block.call(*args)
+      #instance_exec *args, &block
     end
   end
   
@@ -118,11 +125,6 @@ class MPlayer
     names.each do |name|
       callbacks(name).push block
     end
-  end
-  
-  # true if it is ok to call #play
-  def ready?
-    !!path
   end
   
   # true if we are running, yet the media has stopped
@@ -146,7 +148,7 @@ class MPlayer
   end
   
   def worker # :nodoc:
-    must_be_ready! and create_worker unless @worker
+    create_worker if @worker.nil?
     @worker
   end
 
@@ -158,14 +160,6 @@ class MPlayer
     callback! :worker_running
   end
   
-  def must_be_ready! # :nodoc:
-    ready? or raise NotReady
-  end
-  
-  def must_be_running! # :nodoc:
-    running? or raise NotRunning
-  end
-
   def update_stat(name, newval) # :nodoc:
     name = name.to_sym
     if @stats[name] != newval

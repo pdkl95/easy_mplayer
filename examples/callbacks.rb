@@ -44,22 +44,20 @@ class MyApp
   end
   
   def initialize(file)
-    @mplayer = MPlayer.new
+    @mplayer = MPlayer.new( :path => file )
 
-    @mplayer.callback :position do |current_time|
-      total = @mplayer.stats[:total_time]
-      show "Song position: #{current_time} / #{total} seconds"
-    end
+#    @mplayer.callback :position do |current_time|
+#      total = @mplayer.stats[:total_time]
+#      show "Song position: #{current_time} / #{total} seconds"
+#    end
 
-    @mplayer.callback :pause, :unpause do
-      show "song state: " + (@mplayer.paused? ? "PAUSED!" : "RESUMED!")
-    end
+#    @mplayer.callback :pause, :unpause do
+#      show "song state: " + (@mplayer.paused? ? "PAUSED!" : "RESUMED!")
+#    end
 
-    @mplayer.callback :stop do
-      show "song ended!"
-    end
-
-    @mplayer.path = file
+#    @mplayer.callback :stop do
+#      show "song ended!"
+#    end
   end
 end
 

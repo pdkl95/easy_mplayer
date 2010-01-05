@@ -1,5 +1,5 @@
 class MPlayer
-  class Worker
+  class Worker # :nodoc:all
     include ColorDebugMessages
 
     class Stream
@@ -205,8 +205,8 @@ class MPlayer
       debug "mplayer threads created!"
     end
 
-    def cmdline(target = parent.path)
-      cmd = "#{parent.program} -slave "
+    def cmdline(target = parent.opts[:path])
+      cmd = "#{parent.opts[:program]} -slave "
       cmd += "-playlist " if target=~ /\.m3u$/
       cmd += target.to_s
     end

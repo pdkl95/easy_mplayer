@@ -1,8 +1,13 @@
 class MPlayer
+  def play_to_end
+    play
+    sleep 1 while running?
+  end
+  
   def play
     stop if playing?
     
-    info "PLAY: #{path}"
+    info "PLAY: #{opts[:path]}"
     worker.startup!
   end
 
@@ -50,11 +55,11 @@ class MPlayer
     send_command :seek, amount, 0
   end
 
-  def seek_forward(amount = seek_increment)
+  def seek_forward(amount = opts[:seek_size])
     seek_by(amount)
   end
 
-  def seek_reverse(amount = seek_increment)
+  def seek_reverse(amount = opts[:seek_size])
     seek_by(-amount)
   end
 

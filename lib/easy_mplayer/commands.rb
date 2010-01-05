@@ -1,5 +1,5 @@
 class MPlayer
-  class Command
+  class Command # :nodoc:all
     class << self
       def cmdlist_raw
         @cmdlist_raw ||= `mplayer -input cmdlist`.split(/\n/)

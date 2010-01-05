@@ -21,11 +21,8 @@ def command(msg)
   yield
 end
 
-show "Create the player object"
-mplayer = MPlayer.new
-
-show "Setting target as: #{$file}"
-mplayer.path = $file
+show "Create the player object for: #{$file}"
+mplayer = MPlayer.new( :path => $file )
 
 show "Spawning the mplayer process!"
 mplayer.play
