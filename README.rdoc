@@ -10,6 +10,8 @@ Easy MPlayer - A wrapper for easy control of mplayer.
 
 == Usage
 
+See the scripts in the examples/ directory.
+
 = COPYRIGHT
 
 Copyright (c) 2010 Brent Sanders. See LICENSE for details.
