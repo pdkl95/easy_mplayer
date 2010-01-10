@@ -4,7 +4,6 @@ class MPlayer
     :program               => '/usr/bin/mplayer',
     :message_style         => :info,
     :seek_size             => 10,
-    :select_wait_time      => 1,
     :thread_safe_callbacks => true
   }
   
@@ -59,8 +58,6 @@ class MPlayer
   #     :seek_size             Time, in seconds, to seek
   #                            forwards/reverse by default (default:
   #                            10 seconds)
-  #     :select_wait_time      Time, in seconds, for blocking on
-  #                            IO.select in the worker threads (default: 1)
   #     :thread_safe_callbacks If we should buffer callbacks back to
   #                            the main thread, so they are called off
   #                            the #playing? polling-loop (default: true)
@@ -91,16 +88,6 @@ class MPlayer
     stop!
   end
 
-  callback :played_time do |played_time|
-    update_stat :played_seconds, played_time.to_i
-    total = stats[:total_time]
-    if total and total != 0.0
-      pos = (100 * played_time / total)
-      update_stat :raw_position, pos
-      update_stat :position,     pos.to_i
-    end
-  end
-  
   callback :startup do
     callback! :play
   end

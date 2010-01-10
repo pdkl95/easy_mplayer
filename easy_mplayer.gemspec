@@ -9,7 +9,7 @@ Gem::Specification.new do |s|
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Brent Sanders"]
-  s.date = %q{2010-01-09}
+  s.date = %q{2010-01-10}
   s.description = %q{A wrapper to manage mplayer, that supports callbacks to easily support event-driven GUIs}
   s.email = %q{gem-mplayer@thoughtnoise.net}
   s.extra_rdoc_files = [

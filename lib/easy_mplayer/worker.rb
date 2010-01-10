@@ -1,3 +1,5 @@
+require 'fcntl'
+
 class MPlayer
   class Worker # :nodoc:all
     include ColorDebugMessages
@@ -18,9 +20,17 @@ class MPlayer
           :re   => /^ICY Info: StreamTitle='(.*?)';StreamUrl='(.*?)';/,
           :stat => [:stream_title, :stream_url]
         },
-        :update_position => {
-          :re   => /^A:\s+(\d+\.\d+)\s+\(\S+\)\s+of\s+(\d+\.\d+)/,
-          :stat => [:played_time, :total_time],
+        :position_percent => {
+          :re   => /^ANS_PERCENT_POSITION=(\d+[.0-9]*)/,
+          :stat => [:position]
+        },
+        :position_seconds => {
+          :re   => /^ANS_TIME_POSITION=(\d+[.0-9]*)/,
+          :stat => [:played_seconds]
+        },
+        :total_time => {
+          :re   => /^ANS_LENGTH=(\d+[.0-9]*)/,
+          :stat => [:total_time]
         },
         :audio_info => {
           :re   => /^AUDIO: (\d+) Hz, (\d+) ch, (\S+), ([0-9.]+) kbit/,
@@ -131,28 +141,24 @@ class MPlayer
         end
       end
 
-      def process_line
-        # debug "LINE> \"#{@line}\""
-        send "process_#{@type}", @line
-        # callback! @type, @line
-        @line = ''
+      def process_line(line)
+        # debug "LINE> \"#{line}\""
+        send "process_#{@type}", line
+        # callback! @type, line
       end
 
       def process_stream
-        result = IO.select([@io], nil, nil, @select_wait_time)
-        return if result.nil? or result.empty?
-
-        c = @io.read(1)
-        return stream_error(:eof) if c.nil?
-        
-        @line << c
-        process_line if c == "\n" or c == "\r"
+        lines = @io.gets("\r") or return stream_error(:eof)
+        lines.split(/\n/).each do |line|
+          process_line(line.chomp)
+        end
       end
-
+      
       def run
         @thread = Thread.new do
           @alive = true
           begin
+            # @io.fcntl(Fcntl::F_SETFL,Fcntl::O_NONBLOCK)
             debug "start"
             process_stream while @alive
             debug "clean end!"
@@ -216,6 +222,7 @@ class MPlayer
 
     def cmdline(target = parent.opts[:path])
       cmd = "#{parent.opts[:program]} -slave "
+      cmd += "-wid #{parent.opts[:embed]} " if parent.opts[:embed]
       cmd += "-playlist " if target=~ /\.m3u$/
       cmd += target.to_s
     end
@@ -298,6 +305,7 @@ class MPlayer
     end
 
     def ok?
+      get_position
       dispatch_callbacks
       err = nil
       lock! do
@@ -322,7 +330,13 @@ class MPlayer
       @io_stdin = nil
     end
 
+    def get_position
+      send_command :get_time_pos
+      send_command :get_percent_pos
+    end
+
     def startup!
+      send_command :get_time_length
       @parent.callback! :startup
     end
 
