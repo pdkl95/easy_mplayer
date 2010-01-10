@@ -9,6 +9,7 @@ class MPlayer
   # spawn the mplayer process, which also starts the media playing. It
   # is requires that #opts[:path] point to a valid media file
   def play
+    must_be_ready!
     stop if running?
     
     info "PLAY: #{opts[:path]}"
@@ -24,6 +25,7 @@ class MPlayer
   
   # pause playback if we are running
   def pause
+    return unless running?
     return if paused?
     info "PAUSE!"
     send_command :pause
@@ -33,6 +35,7 @@ class MPlayer
   
   # opposite of #pause
   def unpause
+    return unless running?
     return unless paused?
     info "UNPAUSE!"
     send_command :pause
@@ -60,6 +63,7 @@ class MPlayer
   # seek to an absolute position in a file, by seconds. requires a
   # float between 0.0 and the length (in seconds) of the file being played.
   def seek_to_time(seconds)
+    return unless running?
     info "SEEK TO: #{seconds} seconds"
     send_command :seek, seconds, 1
   end
@@ -67,6 +71,7 @@ class MPlayer
   # seek by a relative amount, in seconds. requires a float. Negative
   # values rewind to a previous point.
   def seek_by(amount)
+    return unless running?
     info "SEEK BY: #{amount}"
     send_command :seek, amount, 0
   end

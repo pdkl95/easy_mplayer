@@ -6,7 +6,7 @@ begin
   Jeweler::Tasks.new do |gem|
     gem.name = "easy_mplayer"
     gem.summary = "Wrapper to launch and control MPlayer"
-    gem.description = "A wrapper to manage mplayer, that supports callbacks to easyily support event-driven GUIs"
+    gem.description = "A wrapper to manage mplayer, that supports callbacks to easily support event-driven GUIs"
     gem.email = "gem-mplayer@thoughtnoise.net"
     gem.homepage = "http://github.com/pdkl95/easy_mplayer"
     gem.authors = ["Brent Sanders"]

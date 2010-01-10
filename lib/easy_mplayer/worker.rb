@@ -132,7 +132,7 @@ class MPlayer
       end
 
       def process_line
-        debug "LINE> \"#{@line}\""
+        # debug "LINE> \"#{@line}\""
         send "process_#{@type}", @line
         # callback! @type, @line
         @line = ''

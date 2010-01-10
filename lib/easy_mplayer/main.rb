@@ -49,18 +49,27 @@ class MPlayer
     end
   end
   
-  # create a new object. The option hash must have, at a minimum, a
-  # :path reference to the file we want to play, or an exception will
-  # be raised.
+  # create a new object, with the named options
+  # valid options:
+  #     :program               Path to the mplayer binary itself
+  #                            (default: /usr/bin/mplayer)
+  #     :path                  Path to the media file to be played
+  #     :message_style         How verbose our debug messages should
+  #                            be (see #set_message_style)
+  #     :seek_size             Time, in seconds, to seek
+  #                            forwards/reverse by default (default:
+  #                            10 seconds)
+  #     :select_wait_time      Time, in seconds, for blocking on
+  #                            IO.select in the worker threads (default: 1)
+  #     :thread_safe_callbacks If we should buffer callbacks back to
+  #                            the main thread, so they are called off
+  #                            the #playing? polling-loop (default: true)
   def initialize(new_opts=Hash.new)
     @opts = DEFAULT_OPTS.merge(new_opts)
     set_message_style opts[:message_style]
     
     unless File.executable?(@opts[:program])
       raise NoPlayerFound.new(@opts[:program]) 
-    end
-    unless @opts[:path] and File.readable?(new_opts[:path])
-      raise NoTargetPath.new(@opts[:path]) 
     end
     
     @stats     = Hash.new
@@ -99,6 +108,26 @@ class MPlayer
   callback :shutdown do
     @worker = nil
     callback! :stop
+  end
+  
+  # true if we can call #play without an exception
+  def ready?
+    @opts[:path] and File.readable?(@opts[:path])
+  end
+  
+  def must_be_ready! # :nodoc:
+    ready? or raise NoTargetPath.new(@opts[:path])
+  end
+  
+  # returns the path we are currently playing
+  def path
+    @opts[:path]
+  end
+  
+  # sets the path to #play - this does not interrupt a currently
+  # playing file. #stop and #play should be called again.
+  def path=(val)
+    @opts[:path] = val
   end
 
   # can be any of:
@@ -172,7 +201,7 @@ class MPlayer
   def update_stat(name, newval) # :nodoc:
     name = name.to_sym
     if @stats[name] != newval
-      debug "STATS[:#{name}] -> #{newval.inspect}"
+      debug "STATS[:#{name}] #{@stats[name].inspect} -> #{newval.inspect}"
       @stats[name] = newval
       callback! name, newval
     end
