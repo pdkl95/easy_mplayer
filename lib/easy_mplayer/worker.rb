@@ -222,9 +222,9 @@ class MPlayer
 
     def cmdline(target = parent.opts[:path])
       cmd = "#{parent.opts[:program]} -slave "
-      cmd += "-wid #{parent.opts[:embed]} " if parent.opts[:embed]
+      cmd += "-wid #{parent.opts[:embed].call} " if parent.opts[:embed]
       cmd += "-playlist " if target=~ /\.m3u$/
-      cmd += target.to_s
+      cmd += '"' + target.to_s + '"'
     end
 
     def lock!

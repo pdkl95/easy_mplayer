@@ -85,7 +85,7 @@ class MPlayer
 
   callback :file_error do
     warn "File error!"
-    stop!
+    stop
   end
 
   callback :startup do
@@ -115,6 +115,13 @@ class MPlayer
   # playing file. #stop and #play should be called again.
   def path=(val)
     @opts[:path] = val
+  end
+  
+  # takes a block, that should return the X11 window_id of a window
+  # that mplayer can use as a render target. This will cause mplayer
+  # to embed its output into that window, as if it was a native widget.
+  def embed(&block)
+    @opts[:embed] = block
   end
 
   # can be any of:
